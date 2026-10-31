@@ -1,18 +1,31 @@
+package psoft.arena.model;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.ManyToOne;
+
+@Entity
 public class Atividade {
 
-    private int id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    @ManyToOne(optional = false)
     private Problema problema;
 
-    public Atividade(int id, Problema problema) {
+    protected Atividade() {
+    }
+
+    public Atividade(Problema problema) {
         if (!problema.isAtivo()) {
             throw new IllegalArgumentException("Problemas inativos não podem ser associados a novas atividades.");
         }
-        this.id = id;
         this.problema = problema;
-        problema.marcarComoUtilizado();
     }
 
-    public int getId() {
+    public Long getId() {
         return id;
     }
 

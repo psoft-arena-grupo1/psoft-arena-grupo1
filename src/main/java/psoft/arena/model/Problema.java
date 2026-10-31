@@ -1,21 +1,35 @@
+package psoft.arena.model;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+
+@Entity
 public class Problema {
 
-    private int id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
     private String titulo;
+    @Column(columnDefinition = "TEXT")
     private String descricao;
+    @Column(columnDefinition = "TEXT")
     private String requisitosFuncionais;
+    @Column(columnDefinition = "TEXT")
     private String requisitosDeProjeto;
     private boolean ativo;
-    private boolean utilizado;
 
-    public Problema(int id, String titulo, String descricao, String requisitosFuncionais, String requisitosDeProjeto) {
-        this.id = id;
+    protected Problema() {
+    }
+
+    public Problema(String titulo, String descricao, String requisitosFuncionais, String requisitosDeProjeto) {
         this.titulo = titulo;
         this.descricao = descricao;
         this.requisitosFuncionais = requisitosFuncionais;
         this.requisitosDeProjeto = requisitosDeProjeto;
         this.ativo = true;
-        this.utilizado = false;
     }
 
     public void desativar() {
@@ -26,15 +40,7 @@ public class Problema {
         return ativo;
     }
 
-    public void marcarComoUtilizado() {
-        this.utilizado = true;
-    }
-
-    public boolean isUtilizado() {
-        return utilizado;
-    }
-
-    public int getId() {
+    public Long getId() {
         return id;
     }
 

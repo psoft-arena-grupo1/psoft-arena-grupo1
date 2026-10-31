@@ -1,8 +1,18 @@
+package psoft.arena.model;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+
+@Entity
 public class Estudante {
 
-    private final String matricula;
+    @Id
+    private String matricula;
     private String nome;
     private String email;
+
+    protected Estudante() {
+    }
 
     public Estudante(String nome, String matricula, String email) {
         this.nome = nome;
