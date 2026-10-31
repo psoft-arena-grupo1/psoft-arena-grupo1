@@ -7,12 +7,14 @@ import java.util.Map;
 public class PsoftArena {
     private Map<Integer, Problema> problemas;
     private Map<Integer, Atividade> atividades;
+    private Map<String, Estudante> estudantes;
     private int proximoIdProblema;
     private int proximoIdAtividade;
 
     public PsoftArena() {
         this.problemas = new HashMap<>();
         this.atividades = new HashMap<>();
+        this.estudantes = new HashMap<>();
         this.proximoIdProblema = 1;
         this.proximoIdAtividade = 1;
     }
@@ -86,9 +88,57 @@ public class PsoftArena {
         return atividades.values();
     }
 
+    public String criarEstudante(String nome, String matricula, String email) {
+        validarCamposEstudante(nome, matricula, email);
+        String chave = matricula.strip();
+        if (estudantes.containsKey(chave)) {
+            throw new IllegalArgumentException("Já existe um estudante com essa matrícula.");
+        }
+        estudantes.put(chave, new Estudante(nome, chave, email));
+        return chave;
+    }
+
+    public Estudante buscarEstudante(String matricula) {
+        Estudante current = matricula == null ? null : estudantes.get(matricula.strip());
+        if (current == null) {
+            throw new IllegalArgumentException("Estudante não encontrado.");
+        }
+        return current;
+    }
+
+    public Collection<Estudante> listarEstudantes() {
+        return estudantes.values();
+    }
+
+    public List<Estudante> buscarEstudantesPorNome(String nome) {
+        List<Estudante> encontrados = new ArrayList<>();
+        for (Estudante e : estudantes.values()) {
+            if (e.getNome().toLowerCase().contains(nome.toLowerCase())) {
+                encontrados.add(e);
+            }
+        }
+        return encontrados;
+    }
+
+    public void atualizarEstudante(String matricula, String nome, String email) {
+        validarCamposEstudante(nome, matricula, email);
+        Estudante current = buscarEstudante(matricula);
+        current.setNome(nome);
+        current.setEmail(email);
+    }
+
     private void validarCampos(String titulo, String descricao, String requisitosFuncionais, String requisitosDeProjeto) {
         if (vazio(titulo) || vazio(descricao) || vazio(requisitosFuncionais) || vazio(requisitosDeProjeto)) {
             throw new IllegalArgumentException("Título, descrição, requisitos funcionais e requisitos de projeto são obrigatórios.");
+        }
+    }
+
+    private void validarCamposEstudante(String nome, String matricula, String email) {
+        if (vazio(nome) || vazio(matricula) || vazio(email)) {
+            throw new IllegalArgumentException("Nome, matrícula e e-mail são obrigatórios.");
+        }
+        if (!email.strip().matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) {
+            throw new IllegalArgumentException("E-mail inválido.");
         }
     }
 
