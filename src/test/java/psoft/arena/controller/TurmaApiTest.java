@@ -97,6 +97,41 @@ class TurmaApiTest {
     }
 
     @Test
+    void periodoLetivoExigeQuatroDigitosEPontoSeguidosDeUmOuDois() throws Exception {
+        Number id = criar(dados());
+        for (String invalido : new String[] {
+                "2026", "2026.0", "2026.3", "2026.12", "2026-1", "2026x1",
+                "26.1", "20266.1", "abcd.1", " 2026.1", "2026.1 ", "2026.1\n"
+        }) {
+            Map<String, Object> corpo = dados();
+            corpo.put("nome", "Não deve ser salvo");
+            corpo.put("periodoLetivo", invalido);
+            mvc.perform(post("/turmas").contentType(MediaType.APPLICATION_JSON).content(json(corpo)))
+                    .andExpect(status().isBadRequest());
+            mvc.perform(put("/turmas/{id}", id).contentType(MediaType.APPLICATION_JSON).content(json(corpo)))
+                    .andExpect(status().isBadRequest());
+        }
+        entityManager.flush();
+        entityManager.clear();
+        mvc.perform(get("/turmas/{id}", id)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.nome").value("Projeto de Software"))
+                .andExpect(jsonPath("$.periodoLetivo").value("2026.1"));
+    }
+
+    @Test
+    void aceitaAmbosSemestresNaCriacaoENaEdicao() throws Exception {
+        for (String periodo : new String[] {"2026.1", "2026.2"}) {
+            Map<String, Object> corpo = dados();
+            corpo.put("periodoLetivo", periodo);
+            Number id = criar(corpo);
+            corpo.put("periodoLetivo", periodo.equals("2026.1") ? "2026.2" : "2026.1");
+            mvc.perform(put("/turmas/{id}", id).contentType(MediaType.APPLICATION_JSON).content(json(corpo)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.periodoLetivo").value(corpo.get("periodoLetivo")));
+        }
+    }
+
+    @Test
     void operacoesEmTurmaInexistenteRetornam404() throws Exception {
         mvc.perform(get("/turmas/999999999")).andExpect(status().isNotFound());
         mvc.perform(put("/turmas/999999999").contentType(MediaType.APPLICATION_JSON).content(json(dados())))
@@ -126,20 +161,26 @@ class TurmaApiTest {
     }
 
     @Test
-    void encerrarEIdempotentePreservaOutrasTurmasEPermiteEditarEncerrada() throws Exception {
+    void encerrarEIdempotentePreservaOutrasTurmasERejeitaEditarEncerrada() throws Exception {
         Number encerrada = criar(dados());
         Number ativa = criar(dados()); // Códigos repetidos são permitidos.
         mvc.perform(patch("/turmas/{id}/encerrar", encerrada)).andExpect(status().isOk());
         mvc.perform(patch("/turmas/{id}/encerrar", encerrada)).andExpect(status().isOk());
         Map<String, Object> alterados = dados();
         alterados.put("nome", "Turma encerrada editada");
+        alterados.put("codigo", "P2");
+        alterados.put("periodoLetivo", "2026.2");
+        alterados.put("professorResponsavel", "Bruno");
         alterados.put("status", "ATIVA");
         mvc.perform(put("/turmas/{id}", encerrada).contentType(MediaType.APPLICATION_JSON).content(json(alterados)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ENCERRADA"));
+                .andExpect(status().isBadRequest());
         entityManager.flush();
         entityManager.clear();
         mvc.perform(get("/turmas/{id}", encerrada)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.nome").value("Turma encerrada editada"))
+                .andExpect(jsonPath("$.nome").value("Projeto de Software"))
+                .andExpect(jsonPath("$.codigo").value("P1"))
+                .andExpect(jsonPath("$.periodoLetivo").value("2026.1"))
+                .andExpect(jsonPath("$.professorResponsavel").value("Ana"))
                 .andExpect(jsonPath("$.status").value("ENCERRADA"));
         mvc.perform(get("/turmas/{id}", ativa)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.nome").value("Projeto de Software"))

@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import psoft.arena.dto.TurmaRequest;
 import psoft.arena.exception.RecursoNaoEncontradoException;
+import psoft.arena.model.StatusTurma;
 import psoft.arena.model.Turma;
 import psoft.arena.repository.TurmaRepository;
 
@@ -39,6 +40,9 @@ public class TurmaService {
     public Turma atualizar(Long id, TurmaRequest dados) {
         validarCampos(dados);
         Turma turma = buscar(id);
+        if (turma.getStatus() == StatusTurma.ENCERRADA) {
+            throw new IllegalArgumentException("Não é possível editar uma turma encerrada.");
+        }
         turma.setNome(dados.nome());
         turma.setCodigo(dados.codigo());
         turma.setPeriodoLetivo(dados.periodoLetivo());
@@ -56,6 +60,9 @@ public class TurmaService {
         if (dados == null || vazio(dados.nome()) || vazio(dados.codigo()) || vazio(dados.periodoLetivo())
                 || vazio(dados.professorResponsavel())) {
             throw new IllegalArgumentException("Nome, código, período letivo e professor responsável são obrigatórios.");
+        }
+        if (!dados.periodoLetivo().matches("[0-9]{4}\\.[12]")) {
+            throw new IllegalArgumentException("Período letivo deve estar no formato AAAA.1 ou AAAA.2.");
         }
     }
 }
