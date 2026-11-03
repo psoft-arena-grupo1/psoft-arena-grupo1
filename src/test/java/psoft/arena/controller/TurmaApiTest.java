@@ -1,6 +1,8 @@
 package psoft.arena.controller;
 
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -48,6 +50,27 @@ class TurmaApiTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return JsonPath.read(resposta, "$.id");
+    }
+
+    private void criarEstudante(String matricula, String nome) throws Exception {
+        Map<String, Object> estudante = new LinkedHashMap<>();
+        estudante.put("nome", nome);
+        estudante.put("matricula", matricula);
+        estudante.put("email", nome.toLowerCase() + "@email.com");
+        mvc.perform(post("/estudantes").contentType(MediaType.APPLICATION_JSON).content(json(estudante)))
+                .andExpect(status().isCreated());
+    }
+
+    private String corpoMatricula(String matricula) throws Exception {
+        Map<String, Object> corpo = new LinkedHashMap<>();
+        corpo.put("matricula", matricula);
+        return json(corpo);
+    }
+
+    private void adicionar(Number turmaId, String matricula) throws Exception {
+        mvc.perform(post("/turmas/{id}/estudantes", turmaId).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoMatricula(matricula)))
+                .andExpect(status().isCreated());
     }
 
     @Test
@@ -189,5 +212,128 @@ class TurmaApiTest {
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[?(@.status == 'ENCERRADA')]", hasSize(1)))
                 .andExpect(jsonPath("$[?(@.status == 'ATIVA')]", hasSize(1)));
+    }
+
+    // US05 - Associação de estudantes a turmas
+
+    @Test
+    void adicionarVariosEstudantesEListarOsDaTurma() throws Exception {
+        Number id = criar(dados());
+        criarEstudante("111", "Ana");
+        criarEstudante("222", "Bia");
+        mvc.perform(get("/turmas/{id}/estudantes", id)).andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+
+        mvc.perform(post("/turmas/{id}/estudantes", id).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoMatricula("111")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(id));
+        adicionar(id, "222");
+        entityManager.flush();
+        entityManager.clear();
+
+        mvc.perform(get("/turmas/{id}/estudantes", id)).andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[*].matricula", containsInAnyOrder("111", "222")));
+    }
+
+    @Test
+    void rejeitaAssociacoesInvalidasSemAlterarATurma() throws Exception {
+        Number id = criar(dados());
+        criarEstudante("111", "Ana");
+        adicionar(id, "111");
+
+        mvc.perform(post("/turmas/{id}/estudantes", id).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoMatricula("111")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value("Estudante já está matriculado nesta turma."));
+        for (String invalida : new String[] {null, "", "   "}) {
+            mvc.perform(post("/turmas/{id}/estudantes", id).contentType(MediaType.APPLICATION_JSON)
+                            .content(corpoMatricula(invalida)))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(post("/turmas/{id}/estudantes", id).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/turmas/{id}/estudantes", id).contentType(MediaType.APPLICATION_JSON).content("isto não é json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value("Corpo da requisição inválido."));
+        mvc.perform(post("/turmas/{id}/estudantes", id).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoMatricula("999")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.mensagem").value("Estudante não encontrado."));
+        mvc.perform(post("/turmas/999999999/estudantes").contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoMatricula("111")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.mensagem").value("Turma não encontrada."));
+        entityManager.flush();
+        entityManager.clear();
+
+        mvc.perform(get("/turmas/{id}/estudantes", id)).andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].matricula").value("111"));
+    }
+
+    @Test
+    void removerEstudantePreservaOsDemaisEOCadastroDoEstudante() throws Exception {
+        Number id = criar(dados());
+        criarEstudante("111", "Ana");
+        criarEstudante("222", "Bia");
+        adicionar(id, "111");
+        adicionar(id, "222");
+
+        mvc.perform(delete("/turmas/{id}/estudantes/{matricula}", id, "111")).andExpect(status().isNoContent());
+        entityManager.flush();
+        entityManager.clear();
+
+        mvc.perform(get("/turmas/{id}/estudantes", id)).andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].matricula").value("222"));
+        mvc.perform(get("/estudantes/{matricula}", "111")).andExpect(status().isOk());
+        mvc.perform(delete("/turmas/{id}/estudantes/{matricula}", id, "111")).andExpect(status().isBadRequest());
+        mvc.perform(delete("/turmas/{id}/estudantes/{matricula}", id, "999"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value("Estudante não está matriculado nesta turma."));
+        mvc.perform(delete("/turmas/999999999/estudantes/111")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void turmaEncerradaNaoRecebeNemPerdeEstudantes() throws Exception {
+        Number id = criar(dados());
+        criarEstudante("111", "Ana");
+        criarEstudante("222", "Bia");
+        adicionar(id, "111");
+        mvc.perform(patch("/turmas/{id}/encerrar", id)).andExpect(status().isOk());
+
+        mvc.perform(post("/turmas/{id}/estudantes", id).contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoMatricula("222")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(delete("/turmas/{id}/estudantes/{matricula}", id, "111")).andExpect(status().isBadRequest());
+        entityManager.flush();
+        entityManager.clear();
+
+        mvc.perform(get("/turmas/{id}/estudantes", id)).andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].matricula").value("111"));
+    }
+
+    @Test
+    void estudantePodeParticiparDeVariasTurmas() throws Exception {
+        Number turmaA = criar(dados());
+        Number turmaB = criar(dados());
+        criarEstudante("111", "Ana");
+        adicionar(turmaA, "111");
+        adicionar(turmaB, "111");
+        entityManager.flush();
+        entityManager.clear();
+
+        mvc.perform(get("/turmas/{id}/estudantes", turmaA)).andExpect(jsonPath("$", hasSize(1)));
+        mvc.perform(get("/turmas/{id}/estudantes", turmaB)).andExpect(jsonPath("$", hasSize(1)));
+
+        mvc.perform(delete("/turmas/{id}/estudantes/{matricula}", turmaA, "111")).andExpect(status().isNoContent());
+        entityManager.flush();
+        entityManager.clear();
+
+        mvc.perform(get("/turmas/{id}/estudantes", turmaA)).andExpect(jsonPath("$", hasSize(0)));
+        mvc.perform(get("/turmas/{id}/estudantes", turmaB)).andExpect(jsonPath("$", hasSize(1)));
     }
 }

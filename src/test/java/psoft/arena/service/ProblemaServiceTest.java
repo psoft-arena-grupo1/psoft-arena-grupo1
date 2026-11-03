@@ -13,6 +13,7 @@ import psoft.arena.dto.AtividadeRequest;
 import psoft.arena.dto.ProblemaRequest;
 import psoft.arena.exception.RecursoNaoEncontradoException;
 import psoft.arena.model.Problema;
+import psoft.arena.dto.TurmaRequest;
 
 @SpringBootTest
 @Transactional
@@ -24,12 +25,19 @@ class ProblemaServiceTest {
     @Autowired
     private AtividadeService atividadeService;
 
+    @Autowired
+private TurmaService turmaService;
+
     private Long criarProblemaPadrao(String titulo) {
         return problemaService.criar(new ProblemaRequest(titulo, "Descrição", "Requisitos funcionais", "Requisitos de projeto")).getId();
     }
 
+    private Long criarTurmaPadrao() {
+        return turmaService.criar(new TurmaRequest("Projeto de Software", "P1", "2026.1", "Ana")).getId();
+    }
+
     private Long criarAtividade(Long idProblema) {
-        return atividadeService.criar(new AtividadeRequest(idProblema)).getId();
+        return atividadeService.criar(new AtividadeRequest(idProblema, criarTurmaPadrao())).getId();
     }
 
     @Test

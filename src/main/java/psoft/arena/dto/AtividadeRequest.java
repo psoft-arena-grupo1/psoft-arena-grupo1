@@ -1,4 +1,4 @@
 package psoft.arena.dto;
 
-public record AtividadeRequest(Long problemaId) {
+public record AtividadeRequest(Long problemaId, Long turmaId) {
 }
