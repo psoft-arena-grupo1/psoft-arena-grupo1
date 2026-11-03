@@ -73,8 +73,8 @@ public class TurmaController {
     @DeleteMapping("/{id}/estudantes/{matricula}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Remove um estudante de uma turma ativa")
-    public void removerEstudante(@PathVariable Long id, @PathVariable String Matricula) {
-        turmaService.removeEstudante(id, Matricula);
+    public void removerEstudante(@PathVariable Long id, @PathVariable String matricula) {
+        turmaService.removeEstudante(id, matricula);
     } 
 
     @GetMapping("/{id}/estudantes")
