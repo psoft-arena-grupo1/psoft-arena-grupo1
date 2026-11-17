@@ -14,6 +14,10 @@ import psoft.arena.dto.ProblemaRequest;
 import psoft.arena.exception.RecursoNaoEncontradoException;
 import psoft.arena.model.Problema;
 import psoft.arena.dto.TurmaRequest;
+import psoft.arena.dto.EstrategiaRequest;
+import psoft.arena.dto.ModeloLlmRequest;
+import psoft.arena.model.TipoEstrategia;
+import java.time.LocalDateTime;
 
 @SpringBootTest
 @Transactional
@@ -26,7 +30,13 @@ class ProblemaServiceTest {
     private AtividadeService atividadeService;
 
     @Autowired
-private TurmaService turmaService;
+    private TurmaService turmaService;
+
+    @Autowired
+    private EstrategiaAvaliacaoService estrategiaService;
+
+    @Autowired
+    private ModeloLlmService modeloLlmService;
 
     private Long criarProblemaPadrao(String titulo) {
         return problemaService.criar(new ProblemaRequest(titulo, "Descrição", "Requisitos funcionais", "Requisitos de projeto")).getId();
@@ -37,7 +47,10 @@ private TurmaService turmaService;
     }
 
     private Long criarAtividade(Long idProblema) {
-        return atividadeService.criar(new AtividadeRequest(idProblema, criarTurmaPadrao())).getId();
+        Long idEstrategia = estrategiaService.criar(new EstrategiaRequest("Smells", TipoEstrategia.CODE_SMELLS, "d", "p")).getId();
+        Long idLlm = modeloLlmService.criar(new ModeloLlmRequest("grok-3", "https://api.x.ai/v1", "chave")).getId();
+        return atividadeService.criar(new AtividadeRequest(idProblema, criarTurmaPadrao(), idEstrategia, idLlm, "Lab", "d",
+                LocalDateTime.now().plusDays(7))).getId();
     }
 
     @Test
