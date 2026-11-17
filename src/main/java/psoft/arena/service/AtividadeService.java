@@ -7,9 +7,12 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import psoft.arena.dto.AtividadeEstudanteResponse;
 import psoft.arena.dto.AtividadeRequest;
+import psoft.arena.exception.AcessoNegadoException;
 import psoft.arena.exception.RecursoNaoEncontradoException;
 import psoft.arena.model.Atividade;
+import psoft.arena.model.Estudante;
 import psoft.arena.repository.AtividadeRepository;
 
 @Service
@@ -21,14 +24,17 @@ public class AtividadeService {
     private final TurmaService turmaService;
     private final EstrategiaAvaliacaoService estrategiaService;
     private final ModeloLlmService modeloLlmService;
+    private final EstudanteService estudanteService;
 
     public AtividadeService(AtividadeRepository atividadeRepository, ProblemaService problemaService,
-            TurmaService turmaService, EstrategiaAvaliacaoService estrategiaService, ModeloLlmService modeloLlmService) {
+            TurmaService turmaService, EstrategiaAvaliacaoService estrategiaService, ModeloLlmService modeloLlmService,
+            EstudanteService estudanteService) {
         this.atividadeRepository = atividadeRepository;
         this.problemaService = problemaService;
         this.turmaService = turmaService;
         this.estrategiaService = estrategiaService;
         this.modeloLlmService = modeloLlmService;
+        this.estudanteService = estudanteService;
     }
 
     public Atividade criar(AtividadeRequest dados) {
@@ -48,6 +54,24 @@ public class AtividadeService {
 
     public List<Atividade> listar() {
         return atividadeRepository.findAll();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AtividadeEstudanteResponse> listarDoEstudante(String matricula) {
+        Estudante estudante = estudanteService.buscar(matricula);
+        return atividadeRepository.findByTurmaEstudantesMatricula(estudante.getMatricula()).stream()
+                .map(AtividadeEstudanteResponse::de)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public AtividadeEstudanteResponse buscarDoEstudante(String matricula, Long id) {
+        Estudante estudante = estudanteService.buscar(matricula);
+        Atividade atividade = buscar(id);
+        if (!atividade.visivelPara(estudante)) {
+            throw new AcessoNegadoException("O estudante não participa da turma desta atividade.");
+        }
+        return AtividadeEstudanteResponse.de(atividade);
     }
 
     public Atividade encerrar(Long id) {

@@ -211,4 +211,39 @@ class ApiTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensagem").value("Nome do modelo, URL da API e chave de acesso são obrigatórios."));
     }
+
+    @Test
+    void estudanteConsultaApenasAtividadesDasSuasTurmas() throws Exception {
+        mvc.perform(json(post("/estudantes"), "{\"nome\":\"Ana\",\"matricula\":\"123\",\"email\":\"ana@email.com\"}"));
+        mvc.perform(json(post("/estudantes"), "{\"nome\":\"Bia\",\"matricula\":\"456\",\"email\":\"bia@email.com\"}"));
+        String corpo = corpoAtividade(criarProblema());
+        Integer turmaId = JsonPath.read(corpo, "$.turmaId");
+        Integer atividadeId = criarId("/atividades", corpo);
+        mvc.perform(json(post("/turmas/" + turmaId + "/estudantes"), "{\"matricula\":\"123\"}"));
+
+        mvc.perform(get("/estudantes/123/atividades"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].titulo").value("Lab 1"))
+                .andExpect(jsonPath("$[0].turma").value("POO"))
+                .andExpect(jsonPath("$[0].problema").value("Biblioteca"))
+                .andExpect(jsonPath("$[0].requisitosFuncionais").value("rf"))
+                .andExpect(jsonPath("$[0].requisitosDeProjeto").value("rp"))
+                .andExpect(jsonPath("$[0].estrategiaAvaliacao").value("Smells"))
+                .andExpect(jsonPath("$[0].status").value("ABERTA"));
+
+        mvc.perform(get("/estudantes/456/atividades"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+
+        mvc.perform(get("/estudantes/456/atividades/" + atividadeId))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(patch("/atividades/" + atividadeId + "/encerrar"));
+
+        mvc.perform(get("/estudantes/123/atividades/" + atividadeId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONCLUIDA"))
+                .andExpect(jsonPath("$.aceitaSubmissoes").value(false));
+    }
 }

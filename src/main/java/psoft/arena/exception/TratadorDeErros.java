@@ -15,6 +15,12 @@ public class TratadorDeErros {
         return new ErroResponse(e.getMessage());
     }
 
+    @ExceptionHandler(AcessoNegadoException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErroResponse acessoNegado(AcessoNegadoException e) {
+        return new ErroResponse(e.getMessage());
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErroResponse requisicaoInvalida(IllegalArgumentException e) {

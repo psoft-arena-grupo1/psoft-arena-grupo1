@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -18,10 +19,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import psoft.arena.dto.AtividadeEstudanteResponse;
 import psoft.arena.dto.AtividadeRequest;
+import psoft.arena.exception.AcessoNegadoException;
 import psoft.arena.exception.RecursoNaoEncontradoException;
 import psoft.arena.model.Atividade;
 import psoft.arena.model.EstrategiaAvaliacao;
+import psoft.arena.model.Estudante;
 import psoft.arena.model.ModeloLlm;
 import psoft.arena.model.Problema;
 import psoft.arena.model.StatusAtividade;
@@ -42,6 +46,8 @@ class AtividadeServiceTest {
     private EstrategiaAvaliacaoService estrategiaService;
     @Mock
     private ModeloLlmService modeloLlmService;
+    @Mock
+    private EstudanteService estudanteService;
     @InjectMocks
     private AtividadeService atividadeService;
 
@@ -148,5 +154,52 @@ class AtividadeServiceTest {
         when(atividadeRepository.findById(5L)).thenReturn(Optional.of(atividade));
 
         assertEquals(StatusAtividade.CONCLUIDA, atividadeService.encerrar(5L).getStatus());
+    }
+
+    @Test
+    void listarDoEstudanteRetornaAtividadesDasSuasTurmas() {
+        Estudante estudante = new Estudante("Ana", "123", "ana@email.com");
+        turma.adicionarEstudante(estudante);
+        Atividade atividade = new Atividade(problema, turma, estrategia, llm, "Lab 1", "Descrição", prazo);
+        when(estudanteService.buscar("123")).thenReturn(estudante);
+        when(atividadeRepository.findByTurmaEstudantesMatricula("123")).thenReturn(List.of(atividade));
+
+        List<AtividadeEstudanteResponse> atividades = atividadeService.listarDoEstudante("123");
+
+        assertEquals(1, atividades.size());
+        AtividadeEstudanteResponse resposta = atividades.get(0);
+        assertEquals("Lab 1", resposta.titulo());
+        assertEquals("POO", resposta.turma());
+        assertEquals("Sistema de biblioteca", resposta.problema());
+        assertEquals("Requisitos funcionais", resposta.requisitosFuncionais());
+        assertEquals("Requisitos de projeto", resposta.requisitosDeProjeto());
+        assertEquals("Smells", resposta.estrategiaAvaliacao());
+        assertEquals(prazo, resposta.prazo());
+        assertEquals(StatusAtividade.ABERTA, resposta.status());
+    }
+
+    @Test
+    void buscarDoEstudanteNegaAcessoAAtividadeDeOutraTurma() {
+        Estudante estudante = new Estudante("Ana", "123", "ana@email.com");
+        Atividade atividade = new Atividade(problema, turma, estrategia, llm, "Lab 1", "Descrição", prazo);
+        when(estudanteService.buscar("123")).thenReturn(estudante);
+        when(atividadeRepository.findById(5L)).thenReturn(Optional.of(atividade));
+
+        assertThrows(AcessoNegadoException.class, () -> atividadeService.buscarDoEstudante("123", 5L));
+    }
+
+    @Test
+    void buscarDoEstudanteMostraAtividadeConcluidaSemAceitarSubmissoes() {
+        Estudante estudante = new Estudante("Ana", "123", "ana@email.com");
+        turma.adicionarEstudante(estudante);
+        Atividade atividade = new Atividade(problema, turma, estrategia, llm, "Lab 1", "Descrição", prazo);
+        atividade.encerrar();
+        when(estudanteService.buscar("123")).thenReturn(estudante);
+        when(atividadeRepository.findById(5L)).thenReturn(Optional.of(atividade));
+
+        AtividadeEstudanteResponse resposta = atividadeService.buscarDoEstudante("123", 5L);
+
+        assertEquals(StatusAtividade.CONCLUIDA, resposta.status());
+        assertEquals(false, resposta.aceitaSubmissoes());
     }
 }
