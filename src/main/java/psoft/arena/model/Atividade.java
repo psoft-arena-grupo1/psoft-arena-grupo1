@@ -103,6 +103,10 @@ public class Atividade {
         return status == StatusAtividade.ABERTA;
     }
 
+    public boolean visivelPara(Estudante estudante) {
+        return turma.possuiEstudante(estudante.getMatricula());
+    }
+
     public void garantirParticipante(Estudante estudante) {
         if (!turma.possuiEstudante(estudante.getMatricula())) {
             throw new IllegalArgumentException("Apenas estudantes da turma podem ser adicionados a atividade.");

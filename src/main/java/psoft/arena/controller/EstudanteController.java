@@ -15,9 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import psoft.arena.dto.AtividadeEstudanteResponse;
 import psoft.arena.dto.EstudanteRequest;
 import psoft.arena.dto.EstudanteUpdateRequest;
 import psoft.arena.model.Estudante;
+import psoft.arena.service.AtividadeService;
 import psoft.arena.service.EstudanteService;
 
 @RestController
@@ -26,9 +28,11 @@ import psoft.arena.service.EstudanteService;
 public class EstudanteController {
 
     private final EstudanteService estudanteService;
+    private final AtividadeService atividadeService;
 
-    public EstudanteController(EstudanteService estudanteService) {
+    public EstudanteController(EstudanteService estudanteService, AtividadeService atividadeService) {
         this.estudanteService = estudanteService;
+        this.atividadeService = atividadeService;
     }
 
     @PostMapping
@@ -54,5 +58,17 @@ public class EstudanteController {
     @Operation(summary = "Edita nome e e-mail de um estudante")
     public Estudante atualizar(@PathVariable String matricula, @RequestBody EstudanteUpdateRequest dados) {
         return estudanteService.atualizar(matricula, dados);
+    }
+
+    @GetMapping("/{matricula}/atividades")
+    @Operation(summary = "US07 - Lista as atividades das turmas das quais o estudante participa")
+    public List<AtividadeEstudanteResponse> listarAtividades(@PathVariable String matricula) {
+        return atividadeService.listarDoEstudante(matricula);
+    }
+
+    @GetMapping("/{matricula}/atividades/{id}")
+    @Operation(summary = "US07 - Consulta uma atividade de uma turma da qual o estudante participa")
+    public AtividadeEstudanteResponse buscarAtividade(@PathVariable String matricula, @PathVariable Long id) {
+        return atividadeService.buscarDoEstudante(matricula, id);
     }
 }
