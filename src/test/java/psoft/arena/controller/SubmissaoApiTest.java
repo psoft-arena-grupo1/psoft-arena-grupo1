@@ -1,7 +1,10 @@
 package psoft.arena.controller;
 
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -55,6 +58,10 @@ class SubmissaoApiTest {
 
     private String corpo(String matricula, String codigo) {
         return "{\"matricula\":\"" + matricula + "\",\"codigoFonte\":\"" + codigo + "\"}";
+    }
+
+    private Integer submeter(String matricula) throws Exception {
+        return criarId("/atividades/" + atividadeId + "/submissoes", corpo(matricula, CODIGO));
     }
 
     @BeforeEach
@@ -160,5 +167,97 @@ class SubmissaoApiTest {
         mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), "{\"codigoFonte\":\"" + CODIGO + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensagem").value("A matrícula do estudante é obrigatória."));
+    }
+
+    // Acompanhamento da submissão pelo estudante.
+    // Como a classe é @Transactional (sem commit), a fila não é acionada: a submissão fica em SUBMETIDA.
+
+    @Test
+    void consultarSubmissaoRetornaEstadoAtualEHistoricoInicial() throws Exception {
+        Integer id = submeter("123");
+
+        mvc.perform(get("/estudantes/123/submissoes/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.atividadeId").value(atividadeId))
+                .andExpect(jsonPath("$.matricula").value("123"))
+                .andExpect(jsonPath("$.versao").value(1))
+                .andExpect(jsonPath("$.status").value("SUBMETIDA"))
+                .andExpect(jsonPath("$.historico", hasSize(1)))
+                .andExpect(jsonPath("$.historico[0].statusAnterior").doesNotExist())
+                .andExpect(jsonPath("$.historico[0].statusNovo").value("SUBMETIDA"))
+                .andExpect(jsonPath("$.historico[0].dataHora").value(notNullValue()));
+    }
+
+    @Test
+    void listarSubmissoesDoEstudanteRetornaTodasAsVersoesComSeuEstado() throws Exception {
+        submeter("123");
+        submeter("123");
+
+        mvc.perform(get("/estudantes/123/submissoes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[*].versao", containsInAnyOrder(1, 2)))
+                .andExpect(jsonPath("$[?(@.status != 'SUBMETIDA')]", hasSize(0)));
+    }
+
+    @Test
+    void listaNaoIncluiSubmissoesDeOutrosEstudantes() throws Exception {
+        criarEstudante("456");
+        matricularNaTurma("456");
+        submeter("123");
+        submeter("456");
+
+        mvc.perform(get("/estudantes/123/submissoes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].matricula").value("123"));
+    }
+
+    @Test
+    void estudanteSemSubmissoesRecebeListaVazia() throws Exception {
+        criarEstudante("456");
+
+        mvc.perform(get("/estudantes/456/submissoes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void estudanteNaoConsultaSubmissaoDeOutroEstudante() throws Exception {
+        criarEstudante("456");
+        matricularNaTurma("456");
+        Integer id = submeter("123");
+
+        mvc.perform(get("/estudantes/456/submissoes/" + id))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.mensagem").value("Submissão não encontrada."));
+    }
+
+    @Test
+    void consultarSubmissaoInexistenteRetorna404() throws Exception {
+        mvc.perform(get("/estudantes/123/submissoes/999999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.mensagem").value("Submissão não encontrada."));
+    }
+
+    @Test
+    void consultarSubmissoesDeEstudanteInexistenteRetorna404() throws Exception {
+        mvc.perform(get("/estudantes/999/submissoes"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.mensagem").value("Estudante não encontrado."));
+        mvc.perform(get("/estudantes/999/submissoes/1"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.mensagem").value("Estudante não encontrado."));
+    }
+
+    @Test
+    void submissaoContinuaConsultavelDepoisQueAAtividadeEhConcluida() throws Exception {
+        Integer id = submeter("123");
+        mvc.perform(patch("/atividades/" + atividadeId + "/encerrar")).andExpect(status().isOk());
+
+        mvc.perform(get("/estudantes/123/submissoes/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUBMETIDA"));
     }
 }
