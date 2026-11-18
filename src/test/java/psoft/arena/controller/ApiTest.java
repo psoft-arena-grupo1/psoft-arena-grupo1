@@ -1,6 +1,8 @@
 package psoft.arena.controller;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -13,6 +15,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +39,22 @@ class ApiTest {
                         "{\"titulo\":\"Biblioteca\",\"descricao\":\"d\",\"requisitosFuncionais\":\"rf\",\"requisitosDeProjeto\":\"rp\"}"))
                 .andReturn().getResponse().getContentAsString();
         return JsonPath.read(resposta, "$.id");
+    }
+
+    private Integer criarId(String url, String corpo) throws Exception {
+        String resposta = mvc.perform(json(post(url), corpo)).andReturn().getResponse().getContentAsString();
+        return JsonPath.read(resposta, "$.id");
+    }
+
+    private String corpoAtividade(Integer problemaId) throws Exception {
+        Integer turmaId = criarId("/turmas",
+                "{\"nome\":\"POO\",\"codigo\":\"P1\",\"periodoLetivo\":\"2026.1\",\"professorResponsavel\":\"Ana\"}");
+        Integer estrategiaId = criarId("/estrategias",
+                "{\"nome\":\"Smells\",\"tipo\":\"CODE_SMELLS\",\"descricao\":\"d\",\"prompt\":\"p\"}");
+        Integer llmId = criarId("/llms",
+                "{\"nome\":\"grok-3\",\"urlApi\":\"https://api.x.ai/v1\",\"chaveApi\":\"segredo-123\"}");
+        return "{\"problemaId\":" + problemaId + ",\"turmaId\":" + turmaId + ",\"estrategiaId\":" + estrategiaId
+                + ",\"llmPadraoId\":" + llmId + ",\"titulo\":\"Lab 1\",\"descricao\":\"d\",\"prazo\":\"2999-12-31T23:59:00\"}";
     }
 
     // ---------- problemas ----------
@@ -77,7 +96,7 @@ class ApiTest {
     @Test
     void naoRemoverProblemaUtilizadoRetorna400() throws Exception {
         Integer id = criarProblema();
-        mvc.perform(json(post("/atividades"), "{\"problemaId\":" + id + "}")).andExpect(status().isCreated());
+        mvc.perform(json(post("/atividades"), corpoAtividade(id))).andExpect(status().isCreated());
 
         mvc.perform(delete("/problemas/" + id)).andExpect(status().isBadRequest());
     }
@@ -148,4 +167,83 @@ class ApiTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void criarAtividadeRetorna201AbertaSemExporChaveDaApi() throws Exception {
+        mvc.perform(json(post("/atividades"), corpoAtividade(criarProblema())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("ABERTA"))
+                .andExpect(jsonPath("$.llmPadrao.nome").value("grok-3"))
+                .andExpect(jsonPath("$.llmPadrao.chaveApi").doesNotExist())
+                .andExpect(content().string(not(containsString("segredo-123"))));
+    }
+
+    @Test
+    void criarAtividadeSemLlmRetorna400() throws Exception {
+        String corpo = corpoAtividade(criarProblema()).replaceAll(",\"llmPadraoId\":\\d+", "");
+
+        mvc.perform(json(post("/atividades"), corpo))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value("Turma, problema, estratégia de avaliação e LLM padrão são obrigatórios."));
+    }
+
+    @Test
+    void encerrarAtividadeRetornaStatusConcluida() throws Exception {
+        Integer id = criarId("/atividades", corpoAtividade(criarProblema()));
+
+        mvc.perform(patch("/atividades/" + id + "/encerrar"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONCLUIDA"));
+    }
+
+    @Test
+    void cadastrarLlmNaoRetornaChaveDaApi() throws Exception {
+        Integer id = criarId("/llms", "{\"nome\":\"grok-3\",\"urlApi\":\"https://api.x.ai/v1\",\"chaveApi\":\"segredo-123\"}");
+
+        mvc.perform(get("/llms/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nome").value("grok-3"))
+                .andExpect(content().string(not(containsString("segredo-123"))));
+    }
+
+    @Test
+    void cadastrarLlmSemChaveRetorna400() throws Exception {
+        mvc.perform(json(post("/llms"), "{\"nome\":\"grok-3\",\"urlApi\":\"https://api.x.ai/v1\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value("Nome do modelo, URL da API e chave de acesso são obrigatórios."));
+    }
+
+    @Test
+    void estudanteConsultaApenasAtividadesDasSuasTurmas() throws Exception {
+        mvc.perform(json(post("/estudantes"), "{\"nome\":\"Ana\",\"matricula\":\"123\",\"email\":\"ana@email.com\"}"));
+        mvc.perform(json(post("/estudantes"), "{\"nome\":\"Bia\",\"matricula\":\"456\",\"email\":\"bia@email.com\"}"));
+        String corpo = corpoAtividade(criarProblema());
+        Integer turmaId = JsonPath.read(corpo, "$.turmaId");
+        Integer atividadeId = criarId("/atividades", corpo);
+        mvc.perform(json(post("/turmas/" + turmaId + "/estudantes"), "{\"matricula\":\"123\"}"));
+
+        mvc.perform(get("/estudantes/123/atividades"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].titulo").value("Lab 1"))
+                .andExpect(jsonPath("$[0].turma").value("POO"))
+                .andExpect(jsonPath("$[0].problema").value("Biblioteca"))
+                .andExpect(jsonPath("$[0].requisitosFuncionais").value("rf"))
+                .andExpect(jsonPath("$[0].requisitosDeProjeto").value("rp"))
+                .andExpect(jsonPath("$[0].estrategiaAvaliacao").value("Smells"))
+                .andExpect(jsonPath("$[0].status").value("ABERTA"));
+
+        mvc.perform(get("/estudantes/456/atividades"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+
+        mvc.perform(get("/estudantes/456/atividades/" + atividadeId))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(patch("/atividades/" + atividadeId + "/encerrar"));
+
+        mvc.perform(get("/estudantes/123/atividades/" + atividadeId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONCLUIDA"))
+                .andExpect(jsonPath("$.aceitaSubmissoes").value(false));
+    }
 }

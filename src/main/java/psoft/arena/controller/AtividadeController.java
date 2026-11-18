@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,7 +20,7 @@ import psoft.arena.service.AtividadeService;
 
 @RestController
 @RequestMapping("/atividades")
-@Tag(name = "Atividades", description = "Versão mínima, usada pelas regras da US01; completada na US06")
+@Tag(name = "Atividades", description = "US06 - Criação de atividades")
 public class AtividadeController {
 
     private final AtividadeService atividadeService;
@@ -30,7 +31,7 @@ public class AtividadeController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Cria uma atividade para um problema ativo")
+    @Operation(summary = "Cria uma atividade aberta para uma turma ativa e um problema ativo")
     public Atividade criar(@RequestBody AtividadeRequest dados) {
         return atividadeService.criar(dados);
     }
@@ -45,5 +46,11 @@ public class AtividadeController {
     @Operation(summary = "Consulta uma atividade")
     public Atividade buscar(@PathVariable Long id) {
         return atividadeService.buscar(id);
+    }
+
+    @PatchMapping("/{id}/encerrar")
+    @Operation(summary = "Encerra uma atividade, alterando seu status para concluída")
+    public Atividade encerrar(@PathVariable Long id) {
+        return atividadeService.encerrar(id);
     }
 }
