@@ -202,4 +202,59 @@ class AtividadeServiceTest {
         assertEquals(StatusAtividade.CONCLUIDA, resposta.status());
         assertEquals(false, resposta.aceitaSubmissoes());
     }
+
+    // LLMs adicionais da atividade
+
+    @Test
+    void criarComLlmsAdicionaisAssociaPadraoEAdicional() {
+        mockarAssociacoes();
+        ModeloLlm adicional = new ModeloLlm("gpt-4o", "https://api.openai.com/v1", "chave2");
+        when(modeloLlmService.buscar(5L)).thenReturn(adicional);
+        when(atividadeRepository.save(any(Atividade.class))).thenAnswer(i -> i.getArgument(0));
+
+        Atividade atividade = atividadeService.criar(
+                new AtividadeRequest(1L, 2L, 3L, 4L, "Lab 1", "Descrição", prazo, List.of(4L, 5L)));
+
+        assertSame(llm, atividade.getLlmPadrao());
+        assertEquals(2, atividade.modelosDeAvaliacao().size());
+        assertSame(llm, atividade.modelosDeAvaliacao().get(0));
+        assertSame(adicional, atividade.modelosDeAvaliacao().get(1));
+        assertEquals(1, atividade.getLlmsAdicionais().size());
+        assertSame(adicional, atividade.getLlmsAdicionais().get(0));
+    }
+
+    @Test
+    void criarSemAdicionaisMantemApenasOPadrao() {
+        mockarAssociacoes();
+        when(atividadeRepository.save(any(Atividade.class))).thenAnswer(i -> i.getArgument(0));
+
+        Atividade atividade = atividadeService.criar(request(1L, 2L));
+
+        assertEquals(1, atividade.modelosDeAvaliacao().size());
+        assertSame(llm, atividade.modelosDeAvaliacao().get(0));
+        assertEquals(0, atividade.getLlmsAdicionais().size());
+    }
+
+    @Test
+    void criarIgnoraOPadraoNaListaDeAdicionais() {
+        mockarAssociacoes();
+        when(atividadeRepository.save(any(Atividade.class))).thenAnswer(i -> i.getArgument(0));
+
+        Atividade atividade = atividadeService.criar(
+                new AtividadeRequest(1L, 2L, 3L, 4L, "Lab 1", "Descrição", prazo, List.of(4L)));
+
+        assertEquals(1, atividade.modelosDeAvaliacao().size());
+        assertSame(llm, atividade.modelosDeAvaliacao().get(0));
+        assertEquals(0, atividade.getLlmsAdicionais().size());
+    }
+
+    @Test
+    void criarComAdicionalInexistentePropagaNaoEncontrado() {
+        mockarAssociacoes();
+        when(modeloLlmService.buscar(99L)).thenThrow(new RecursoNaoEncontradoException("Modelo de LLM não encontrado."));
+
+        assertThrows(RecursoNaoEncontradoException.class, () -> atividadeService.criar(
+                new AtividadeRequest(1L, 2L, 3L, 4L, "Lab 1", "Descrição", prazo, List.of(99L))));
+        verify(atividadeRepository, never()).save(any());
+    }
 }
