@@ -39,12 +39,20 @@ public class AtividadeService {
 
     public Atividade criar(AtividadeRequest dados) {
         validarCampos(dados);
-        return atividadeRepository.save(new Atividade(
+        Atividade atividade = new Atividade(
                 problemaService.buscar(dados.problemaId()),
                 turmaService.buscar(dados.turmaId()),
                 estrategiaService.buscar(dados.estrategiaId()),
                 modeloLlmService.buscar(dados.llmPadraoId()),
-                dados.titulo(), dados.descricao(), dados.prazo()));
+                dados.titulo(), dados.descricao(), dados.prazo());
+        if (dados.llmsAdicionaisIds() != null) {
+            for (Long llmId : dados.llmsAdicionaisIds()) {
+                if (llmId != null) {
+                    atividade.adicionarLlm(modeloLlmService.buscar(llmId));
+                }
+            }
+        }
+        return atividadeRepository.save(atividade);
     }
 
     public Atividade buscar(Long id) {
