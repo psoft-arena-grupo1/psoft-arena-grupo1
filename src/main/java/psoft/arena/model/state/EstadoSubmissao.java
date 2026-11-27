@@ -1,5 +1,6 @@
 package psoft.arena.model.state;
 
+import psoft.arena.exception.TransicaoInvalidaException;
 import psoft.arena.model.StatusSubmissao;
 
 public interface EstadoSubmissao {
@@ -22,8 +23,12 @@ public interface EstadoSubmissao {
         throw transicaoInvalida("marcar como falha");
     }
 
-    private IllegalStateException transicaoInvalida(String operacao) {
-        return new IllegalStateException("Não é possível " + operacao + " uma submissão no estado "
+    default EstadoSubmissao reprocessar() {
+        throw transicaoInvalida("reprocessar");
+    }
+
+    private TransicaoInvalidaException transicaoInvalida(String operacao) {
+        return new TransicaoInvalidaException("Não é possível " + operacao + " uma submissão no estado "
             + status().getDescricao() + ".");
     }
 

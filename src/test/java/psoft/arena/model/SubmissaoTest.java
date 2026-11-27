@@ -1,5 +1,6 @@
 package psoft.arena.model;
 
+import psoft.arena.exception.TransicaoInvalidaException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -277,5 +278,60 @@ class SubmissaoTest {
 
         assertThrows(UnsupportedOperationException.class, () -> submissao.getHistorico().clear());
         assertEquals(1, submissao.getHistorico().size());
+    }
+
+    @Test
+    void reprocessarSubmissaoComFalhaVoltaParaEmFilaComOMesmoCodigo() {
+        Submissao submissao = processando();
+        submissao.falhar();
+
+        HistoricoSubmissao registro = submissao.reprocessar();
+
+        assertEquals(StatusSubmissao.EM_FILA, submissao.getStatus());
+        assertEquals(StatusSubmissao.FALHA, registro.getStatusAnterior());
+        assertEquals(StatusSubmissao.EM_FILA, registro.getStatusNovo());
+        assertEquals("Reprocessamento solicitado (tentativa 2).", registro.getMotivo());
+        assertEquals(CODIGO, submissao.getCodigoFonte());
+        assertEquals(1, submissao.getVersao());
+    }
+
+    @Test
+    void reprocessamentoPreservaOHistoricoDasTentativasAnteriores() {
+        Submissao submissao = processando();
+        submissao.falhar();
+        submissao.reprocessar();
+        submissao.iniciarProcessamento();
+        submissao.concluir();
+
+        assertEquals(List.of(StatusSubmissao.SUBMETIDA, StatusSubmissao.EM_FILA, StatusSubmissao.PROCESSANDO,
+                StatusSubmissao.FALHA, StatusSubmissao.EM_FILA, StatusSubmissao.PROCESSANDO,
+                StatusSubmissao.CONCLUIDA),
+                submissao.getHistorico().stream().map(HistoricoSubmissao::getStatusNovo).toList());
+        assertEquals(2, submissao.tentativas());
+    }
+
+    @Test
+    void somenteSubmissoesComFalhaPodemSerReprocessadas() {
+        Submissao concluida = processando();
+        concluida.concluir();
+
+        assertThrows(TransicaoInvalidaException.class, () -> novaSubmissao().reprocessar());
+        assertThrows(TransicaoInvalidaException.class, () -> emFila().reprocessar());
+        assertThrows(TransicaoInvalidaException.class, () -> processando().reprocessar());
+        TransicaoInvalidaException erro = assertThrows(TransicaoInvalidaException.class, concluida::reprocessar);
+        assertEquals("Não é possível reprocessar uma submissão no estado Concluída.", erro.getMessage());
+        assertEquals(StatusSubmissao.CONCLUIDA, concluida.getStatus());
+    }
+
+    @Test
+    void submissaoPodeSerReprocessadaNovamenteSeFalharOutraVez() {
+        Submissao submissao = processando();
+        submissao.falhar();
+        submissao.reprocessar();
+        submissao.iniciarProcessamento();
+        submissao.falhar();
+
+        assertEquals("Reprocessamento solicitado (tentativa 3).", submissao.reprocessar().getMotivo());
+        assertEquals(3, submissao.tentativas());
     }
 }

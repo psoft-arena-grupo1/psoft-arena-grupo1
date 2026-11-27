@@ -91,6 +91,15 @@ public class Submissao {
         return transitar(estado().falhar(), null);
     }
 
+    public HistoricoSubmissao reprocessar() {
+        EstadoSubmissao novoEstado = estado().reprocessar();
+        return transitar(novoEstado, "Reprocessamento solicitado (tentativa " + (tentativas() + 1) + ").");
+    }
+
+    public int tentativas() {
+        return (int) historico.stream().filter(r -> r.getStatusNovo() == StatusSubmissao.EM_FILA).count();
+    }
+
     private EstadoSubmissao estado() {
         return EstadoSubmissao.de(status);
     }

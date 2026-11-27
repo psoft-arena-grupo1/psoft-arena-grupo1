@@ -1,5 +1,6 @@
 package psoft.arena.service;
 
+import psoft.arena.exception.TransicaoInvalidaException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -373,5 +374,43 @@ class SubmissaoServiceTest {
                 () -> submissaoService.buscarDoEstudante("456", 5L));
 
         assertEquals("Submissão não encontrada.", erro.getMessage());
+    }
+
+    @Test
+    void reprocessarVoltaParaEmFilaNotificaEPublicaEventoSemCriarNovaSubmissao() {
+        Submissao submissao = novaSubmissao();
+        submissao.encaminhar();
+        submissao.iniciarProcessamento();
+        submissao.falhar();
+        when(submissaoRepository.findById(1L)).thenReturn(Optional.of(submissao));
+
+        AcompanhamentoSubmissaoResponse resposta = submissaoService.reprocessar(1L);
+
+        assertEquals(StatusSubmissao.EM_FILA, resposta.status());
+        assertEquals(5, resposta.historico().size());
+        ArgumentCaptor<HistoricoSubmissao> registro = ArgumentCaptor.forClass(HistoricoSubmissao.class);
+        verify(notificador).notificar(registro.capture());
+        assertEquals(StatusSubmissao.FALHA, registro.getValue().getStatusAnterior());
+        assertEquals(StatusSubmissao.EM_FILA, registro.getValue().getStatusNovo());
+        verify(eventos).publishEvent(any(SubmissaoReprocessadaEvent.class));
+        verify(submissaoRepository, never()).save(any());
+    }
+
+    @Test
+    void reprocessarSubmissaoQueNaoFalhouNaoNotificaNemReenfileira() {
+        Submissao submissao = novaSubmissao();
+        when(submissaoRepository.findById(1L)).thenReturn(Optional.of(submissao));
+
+        assertThrows(TransicaoInvalidaException.class, () -> submissaoService.reprocessar(1L));
+
+        assertEquals(StatusSubmissao.SUBMETIDA, submissao.getStatus());
+        verifyNoInteractions(notificador, eventos);
+    }
+
+    @Test
+    void reprocessarSubmissaoInexistenteLancaNaoEncontrado() {
+        when(submissaoRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(RecursoNaoEncontradoException.class, () -> submissaoService.reprocessar(99L));
     }
 }
