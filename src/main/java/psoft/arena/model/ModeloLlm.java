@@ -3,10 +3,12 @@ package psoft.arena.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import psoft.arena.config.ChaveApiConverter;
 
 @Entity
 public class ModeloLlm {
@@ -19,7 +21,8 @@ public class ModeloLlm {
     @Column(nullable = false)
     private String urlApi;
     @JsonIgnore
-    @Column(nullable = false)
+    @Convert(converter = ChaveApiConverter.class)
+    @Column(nullable = false, length = 1024)
     private String chaveApi;
 
     protected ModeloLlm() {

@@ -125,6 +125,17 @@ class SubmissaoTest {
     }
 
     @Test
+    void codigoJavaComErroDeSintaxeNaoEhAceito() {
+        IllegalArgumentException erro = assertThrows(IllegalArgumentException.class,
+                () -> new Submissao(estudante, atividade, "public class Biblioteca {\n    void m() { int x = ; }\n}", 1));
+        assertTrue(erro.getMessage().startsWith("O código Java submetido possui erro de sintaxe na linha 2"));
+        assertThrows(IllegalArgumentException.class,
+                () -> new Submissao(estudante, atividade, "class A { lixo !!! }", 1));
+        assertThrows(IllegalArgumentException.class,
+                () -> new Submissao(estudante, atividade, "class A {", 1));
+    }
+
+    @Test
     void versaoDeveSerPositiva() {
         IllegalArgumentException erro = assertThrows(IllegalArgumentException.class,
                 () -> new Submissao(estudante, atividade, CODIGO, 0));

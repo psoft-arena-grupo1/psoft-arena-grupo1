@@ -69,7 +69,9 @@ class AvaliacaoApiTest {
     }
 
     private Integer submeter(String matricula) throws Exception {
-        return criarId("/atividades/" + atividadeId + "/submissoes", corpo(matricula, CODIGO));
+        String resposta = mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo(matricula, CODIGO))
+                .header("X-Matricula", matricula)).andReturn().getResponse().getContentAsString();
+        return JsonPath.read(resposta, "$.id");
     }
 
     private Avaliacao criarAvaliacaoConcluida(Integer submissaoId) {

@@ -61,7 +61,9 @@ class SubmissaoApiTest {
     }
 
     private Integer submeter(String matricula) throws Exception {
-        return criarId("/atividades/" + atividadeId + "/submissoes", corpo(matricula, CODIGO));
+        String resposta = mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo(matricula, CODIGO))
+                .header("X-Matricula", matricula)).andReturn().getResponse().getContentAsString();
+        return JsonPath.read(resposta, "$.id");
     }
 
     @BeforeEach
@@ -83,7 +85,7 @@ class SubmissaoApiTest {
 
     @Test
     void submeterRetorna201ComStatusSubmetidaEMensagemDeRecebimento() throws Exception {
-        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", CODIGO)))
+        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", CODIGO)).header("X-Matricula", "123"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(notNullValue()))
                 .andExpect(jsonPath("$.atividadeId").value(atividadeId))
@@ -96,12 +98,12 @@ class SubmissaoApiTest {
 
     @Test
     void cadaNovaSubmissaoGeraNovaVersao() throws Exception {
-        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", CODIGO)))
+        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", CODIGO)).header("X-Matricula", "123"))
                 .andExpect(jsonPath("$.versao").value(1));
-        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", CODIGO)))
+        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", CODIGO)).header("X-Matricula", "123"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.versao").value(2));
-        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", CODIGO)))
+        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", CODIGO)).header("X-Matricula", "123"))
                 .andExpect(jsonPath("$.versao").value(3));
     }
 
@@ -110,9 +112,9 @@ class SubmissaoApiTest {
         criarEstudante("456");
         matricularNaTurma("456");
 
-        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", CODIGO)))
+        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", CODIGO)).header("X-Matricula", "123"))
                 .andExpect(jsonPath("$.versao").value(1));
-        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("456", CODIGO)))
+        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("456", CODIGO)).header("X-Matricula", "456"))
                 .andExpect(jsonPath("$.versao").value(1));
     }
 
@@ -120,7 +122,7 @@ class SubmissaoApiTest {
     void estudanteForaDaTurmaRetorna403() throws Exception {
         criarEstudante("456");
 
-        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("456", CODIGO)))
+        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("456", CODIGO)).header("X-Matricula", "456"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.mensagem").value("Somente estudantes da turma da atividade podem realizar submissões."));
     }
@@ -129,35 +131,35 @@ class SubmissaoApiTest {
     void atividadeConcluidaRetorna400() throws Exception {
         mvc.perform(patch("/atividades/" + atividadeId + "/encerrar")).andExpect(status().isOk());
 
-        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", CODIGO)))
+        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", CODIGO)).header("X-Matricula", "123"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensagem").value("Atividades concluídas não aceitam novas submissões."));
     }
 
     @Test
     void atividadeInexistenteRetorna404() throws Exception {
-        mvc.perform(json(post("/atividades/999999/submissoes"), corpo("123", CODIGO)))
+        mvc.perform(json(post("/atividades/999999/submissoes"), corpo("123", CODIGO)).header("X-Matricula", "123"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensagem").value("Atividade não encontrada."));
     }
 
     @Test
     void estudanteInexistenteRetorna404() throws Exception {
-        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("999", CODIGO)))
+        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("999", CODIGO)).header("X-Matricula", "999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensagem").value("Estudante não encontrado."));
     }
 
     @Test
     void codigoQueNaoEhJavaRetorna400() throws Exception {
-        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", "print('oi')")))
+        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", "print('oi')")).header("X-Matricula", "123"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensagem").value("A solução deve ser submetida em Java."));
     }
 
     @Test
     void codigoVazioRetorna400() throws Exception {
-        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", "")))
+        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", "")).header("X-Matricula", "123"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensagem").value("O código-fonte da solução é obrigatório."));
     }
@@ -176,7 +178,7 @@ class SubmissaoApiTest {
     void consultarSubmissaoRetornaEstadoAtualEHistoricoInicial() throws Exception {
         Integer id = submeter("123");
 
-        mvc.perform(get("/estudantes/123/submissoes/" + id))
+        mvc.perform(get("/estudantes/123/submissoes/" + id).header("X-Matricula", "123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.atividadeId").value(atividadeId))
@@ -194,7 +196,7 @@ class SubmissaoApiTest {
         submeter("123");
         submeter("123");
 
-        mvc.perform(get("/estudantes/123/submissoes"))
+        mvc.perform(get("/estudantes/123/submissoes").header("X-Matricula", "123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[*].versao", containsInAnyOrder(1, 2)))
@@ -208,7 +210,7 @@ class SubmissaoApiTest {
         submeter("123");
         submeter("456");
 
-        mvc.perform(get("/estudantes/123/submissoes"))
+        mvc.perform(get("/estudantes/123/submissoes").header("X-Matricula", "123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].matricula").value("123"));
@@ -218,7 +220,7 @@ class SubmissaoApiTest {
     void estudanteSemSubmissoesRecebeListaVazia() throws Exception {
         criarEstudante("456");
 
-        mvc.perform(get("/estudantes/456/submissoes"))
+        mvc.perform(get("/estudantes/456/submissoes").header("X-Matricula", "456"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(0)));
     }
@@ -229,24 +231,24 @@ class SubmissaoApiTest {
         matricularNaTurma("456");
         Integer id = submeter("123");
 
-        mvc.perform(get("/estudantes/456/submissoes/" + id))
+        mvc.perform(get("/estudantes/456/submissoes/" + id).header("X-Matricula", "456"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensagem").value("Submissão não encontrada."));
     }
 
     @Test
     void consultarSubmissaoInexistenteRetorna404() throws Exception {
-        mvc.perform(get("/estudantes/123/submissoes/999999"))
+        mvc.perform(get("/estudantes/123/submissoes/999999").header("X-Matricula", "123"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensagem").value("Submissão não encontrada."));
     }
 
     @Test
     void consultarSubmissoesDeEstudanteInexistenteRetorna404() throws Exception {
-        mvc.perform(get("/estudantes/999/submissoes"))
+        mvc.perform(get("/estudantes/999/submissoes").header("X-Matricula", "999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensagem").value("Estudante não encontrado."));
-        mvc.perform(get("/estudantes/999/submissoes/1"))
+        mvc.perform(get("/estudantes/999/submissoes/1").header("X-Matricula", "999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensagem").value("Estudante não encontrado."));
     }
@@ -256,8 +258,37 @@ class SubmissaoApiTest {
         Integer id = submeter("123");
         mvc.perform(patch("/atividades/" + atividadeId + "/encerrar")).andExpect(status().isOk());
 
-        mvc.perform(get("/estudantes/123/submissoes/" + id))
+        mvc.perform(get("/estudantes/123/submissoes/" + id).header("X-Matricula", "123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUBMETIDA"));
+    }
+
+    @Test
+    void submeterSemIdentificacaoRetorna401() throws Exception {
+        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", CODIGO)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void submeterEmNomeDeOutroEstudanteRetorna403() throws Exception {
+        criarEstudante("456");
+        matricularNaTurma("456");
+
+        mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"), corpo("123", CODIGO))
+                .header("X-Matricula", "456"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void consultarSubmissoesDeOutroEstudanteRetorna403() throws Exception {
+        criarEstudante("456");
+        submeter("123");
+
+        mvc.perform(get("/estudantes/123/submissoes").header("X-Matricula", "456"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/estudantes/123/atividades").header("X-Matricula", "456"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/estudantes/123/submissoes"))
+                .andExpect(status().isUnauthorized());
     }
 }

@@ -15,6 +15,12 @@ public class TratadorDeErros {
         return new ErroResponse(e.getMessage());
     }
 
+    @ExceptionHandler(NaoAutenticadoException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErroResponse naoAutenticado(NaoAutenticadoException e) {
+        return new ErroResponse(e.getMessage());
+    }
+
     @ExceptionHandler(AcessoNegadoException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ErroResponse acessoNegado(AcessoNegadoException e) {

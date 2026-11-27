@@ -4,12 +4,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import psoft.arena.config.ControleAcessoEstudante;
 import psoft.arena.dto.SubmissaoRequest;
 import psoft.arena.dto.SubmissaoResponse;
 import psoft.arena.service.SubmissaoService;
@@ -28,7 +30,11 @@ public class SubmissaoController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Submete uma solução em Java para uma atividade aberta; cada envio gera uma nova versão")
-    public SubmissaoResponse submeter(@PathVariable Long atividadeId, @RequestBody SubmissaoRequest dados) {
+    public SubmissaoResponse submeter(@PathVariable Long atividadeId, @RequestBody SubmissaoRequest dados,
+            @RequestHeader(name = ControleAcessoEstudante.CABECALHO, required = false) String matriculaAutenticada) {
+        if (dados != null && dados.matricula() != null && !dados.matricula().isBlank()) {
+            ControleAcessoEstudante.verificar(matriculaAutenticada, dados.matricula());
+        }
         return SubmissaoResponse.de(submissaoService.submeter(atividadeId, dados));
     }
 }
