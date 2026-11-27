@@ -21,4 +21,13 @@ public class NotificadorSubmissao {
         }
         System.out.println(mensagem);
     }
+
+    public void notificarResultadoDisponivel(Submissao submissao) {
+        Estudante estudante = submissao.getEstudante();
+        System.out.println("[NOTIFICAÇÃO] " + estudante.getNome() + " (" + estudante.getMatricula()
+                + "): o resultado da avaliação da sua submissão " + submissao.getId() + " (atividade "
+                + submissao.getAtividade().getId() + ", versão " + submissao.getVersao()
+                + ") já está disponível. Consulte em GET /estudantes/" + estudante.getMatricula()
+                + "/submissoes/" + submissao.getId() + "/resultado.");
+    }
 }

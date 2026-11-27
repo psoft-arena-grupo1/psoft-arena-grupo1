@@ -81,7 +81,9 @@ public class SubmissaoService {
     }
 
     public void concluir(Long id) {
-        notificador.notificar(buscar(id).concluir());
+        Submissao submissao = buscar(id);
+        notificador.notificar(submissao.concluir());
+        notificador.notificarResultadoDisponivel(submissao);
     }
 
     public void falhar(Long id) {

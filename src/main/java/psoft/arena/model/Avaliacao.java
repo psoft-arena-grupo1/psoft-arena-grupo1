@@ -96,6 +96,10 @@ public class Avaliacao {
         this.status = StatusAvaliacao.FALHA;
     }
 
+    public boolean resultadoDisponivel() {
+        return status == StatusAvaliacao.CONCLUIDA;
+    }
+
     private void exigirProcessando(String predicado) {
         if (status != StatusAvaliacao.PROCESSANDO) {
             throw new IllegalStateException("Apenas avaliações em processamento " + predicado + ".");

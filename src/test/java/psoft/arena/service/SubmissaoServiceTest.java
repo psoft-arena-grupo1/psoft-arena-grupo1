@@ -264,6 +264,30 @@ class SubmissaoServiceTest {
     }
 
     @Test
+    void concluirAvisaOEstudanteQueOResultadoEstaDisponivel() {
+        Submissao submissao = novaSubmissao();
+        submissao.encaminhar();
+        submissao.iniciarProcessamento();
+        when(submissaoRepository.findById(1L)).thenReturn(Optional.of(submissao));
+
+        submissaoService.concluir(1L);
+
+        verify(notificador).notificarResultadoDisponivel(submissao);
+    }
+
+    @Test
+    void falharNaoAvisaQueOResultadoEstaDisponivel() {
+        Submissao submissao = novaSubmissao();
+        submissao.encaminhar();
+        submissao.iniciarProcessamento();
+        when(submissaoRepository.findById(1L)).thenReturn(Optional.of(submissao));
+
+        submissaoService.falhar(1L);
+
+        verify(notificador, never()).notificarResultadoDisponivel(any());
+    }
+
+    @Test
     void falharMarcaASubmissaoComoFalhaENotifica() {
         Submissao submissao = novaSubmissao();
         submissao.encaminhar();
