@@ -4,7 +4,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.regex.Pattern;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -25,9 +24,6 @@ import jakarta.persistence.OrderBy;
 @Entity
 @Table(uniqueConstraints = @UniqueConstraint(columnNames = { "estudante_matricula", "atividade_id", "versao" }))
 public class Submissao {
-
-    private static final Pattern DECLARACAO_JAVA = Pattern
-            .compile("\\b(class|interface|enum|record)\\s+[A-Za-z_$][\\w$]*[^;{]*\\{");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -66,9 +62,7 @@ public class Submissao {
         if (codigoFonte == null || codigoFonte.isBlank()) {
             throw new IllegalArgumentException("O código-fonte da solução é obrigatório.");
         }
-        if (!pareceCodigoJava(codigoFonte)) {
-            throw new IllegalArgumentException("A solução deve ser submetida em Java.");
-        }
+        ValidadorCodigoJava.validar(codigoFonte);
         if (versao < 1) {
             throw new IllegalArgumentException("A versão da submissão deve ser maior que zero.");
         }
@@ -79,10 +73,6 @@ public class Submissao {
         this.dataHora = LocalDateTime.now();
         this.status = StatusSubmissao.SUBMETIDA;
         registrar(null, StatusSubmissao.SUBMETIDA, null);
-    }
-
-    private static boolean pareceCodigoJava(String codigoFonte) {
-        return DECLARACAO_JAVA.matcher(codigoFonte).find();
     }
 
     public HistoricoSubmissao encaminhar() {
@@ -99,6 +89,15 @@ public class Submissao {
 
     public HistoricoSubmissao falhar() {
         return transitar(estado().falhar(), null);
+    }
+
+    public HistoricoSubmissao reprocessar() {
+        EstadoSubmissao novoEstado = estado().reprocessar();
+        return transitar(novoEstado, "Reprocessamento solicitado (tentativa " + (tentativas() + 1) + ").");
+    }
+
+    public int tentativas() {
+        return (int) historico.stream().filter(r -> r.getStatusNovo() == StatusSubmissao.EM_FILA).count();
     }
 
     private EstadoSubmissao estado() {

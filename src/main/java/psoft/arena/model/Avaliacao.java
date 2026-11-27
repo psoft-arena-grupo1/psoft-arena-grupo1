@@ -16,7 +16,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.OneToOne;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OrderBy;
 
 @Entity
@@ -26,8 +26,8 @@ public class Avaliacao {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(optional = false)
-    @JoinColumn(nullable = false, unique = true)
+    @ManyToOne(optional = false)
+    @JoinColumn(nullable = false)
     private Submissao submissao;
 
     @Enumerated(EnumType.STRING)

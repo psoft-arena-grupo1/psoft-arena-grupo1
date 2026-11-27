@@ -202,4 +202,26 @@ class AvaliacaoServiceTest {
 
         assertEquals("Avaliação não encontrada.", erro.getMessage());
     }
+
+    @Test
+    void novaTentativaDeAvaliacaoEhPermitidaAposFalhaEPreservaAAnterior() {
+        Cenario cenario = criarCenario();
+        Avaliacao primeira = avaliacaoService.iniciar(cenario.submissaoId());
+        avaliacaoService.falhar(primeira.getId(), "timeout");
+
+        Avaliacao segunda = avaliacaoService.iniciar(cenario.submissaoId());
+        avaliacaoService.concluir(segunda.getId(), new BigDecimal("9.0"), "e1", "j1");
+
+        assertEquals(StatusAvaliacao.CONCLUIDA, avaliacaoService.buscarPorSubmissao(cenario.submissaoId()).status());
+        var tentativas = avaliacaoService.listarTentativas(cenario.submissaoId());
+        assertEquals(2, tentativas.size());
+        assertEquals(StatusAvaliacao.FALHA, tentativas.get(0).status());
+        assertEquals("timeout", tentativas.get(0).motivoFalha());
+        assertEquals(StatusAvaliacao.CONCLUIDA, tentativas.get(1).status());
+    }
+
+    @Test
+    void listarTentativasDeSubmissaoInexistenteLancaNaoEncontrado() {
+        assertThrows(RecursoNaoEncontradoException.class, () -> avaliacaoService.listarTentativas(999999L));
+    }
 }

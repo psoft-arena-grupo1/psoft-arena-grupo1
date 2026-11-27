@@ -86,6 +86,13 @@ public class SubmissaoService {
         notificador.notificarResultadoDisponivel(submissao);
     }
 
+    public AcompanhamentoSubmissaoResponse reprocessar(Long id) {
+        Submissao submissao = buscar(id);
+        notificador.notificar(submissao.reprocessar());
+        eventos.publishEvent(new SubmissaoReprocessadaEvent(submissao.getId()));
+        return AcompanhamentoSubmissaoResponse.de(submissao);
+    }
+
     public void falhar(Long id) {
         notificador.notificar(buscar(id).falhar());
     }

@@ -8,4 +8,9 @@ public final class Falha implements EstadoSubmissao {
     public StatusSubmissao status() {
         return StatusSubmissao.FALHA;
     }
+
+    @Override
+    public EstadoSubmissao reprocessar() {
+        return new EmFila();
+    }
 }

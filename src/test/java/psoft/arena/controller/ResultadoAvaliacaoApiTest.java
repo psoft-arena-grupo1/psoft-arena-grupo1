@@ -62,8 +62,10 @@ class ResultadoAvaliacaoApiTest {
     }
 
     private Integer submeter(String matricula) throws Exception {
-        return criarId("/atividades/" + atividadeId + "/submissoes",
-                "{\"matricula\":\"" + matricula + "\",\"codigoFonte\":\"" + CODIGO + "\"}");
+        String resposta = mvc.perform(json(post("/atividades/" + atividadeId + "/submissoes"),
+                "{\"matricula\":\"" + matricula + "\",\"codigoFonte\":\"" + CODIGO + "\"}")
+                .header("X-Matricula", matricula)).andReturn().getResponse().getContentAsString();
+        return JsonPath.read(resposta, "$.id");
     }
 
     private Avaliacao novaAvaliacao(Integer submissaoId) {
@@ -98,7 +100,7 @@ class ResultadoAvaliacaoApiTest {
         avaliacao.concluir(new BigDecimal("8.5"), "e1\ne2", "Boa separação de responsabilidades.");
         avaliacaoRepository.save(avaliacao);
 
-        mvc.perform(get(urlResultado("123", submissaoId)))
+        mvc.perform(get(urlResultado("123", submissaoId)).header("X-Matricula", "123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.submissaoId").value(submissaoId))
                 .andExpect(jsonPath("$.atividadeId").value(atividadeId))
@@ -116,7 +118,7 @@ class ResultadoAvaliacaoApiTest {
         avaliacao.concluir(new BigDecimal("8.5"), "e1", "j1");
         avaliacaoRepository.save(avaliacao);
 
-        mvc.perform(get(urlResultado("123", submissaoId)))
+        mvc.perform(get(urlResultado("123", submissaoId)).header("X-Matricula", "123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultados").doesNotExist())
                 .andExpect(jsonPath("$.motivoFalha").doesNotExist())
@@ -134,10 +136,10 @@ class ResultadoAvaliacaoApiTest {
         a2.concluir(new BigDecimal("9"), "e", "j");
         avaliacaoRepository.save(a2);
 
-        mvc.perform(get(urlResultado("123", primeira)))
+        mvc.perform(get(urlResultado("123", primeira)).header("X-Matricula", "123"))
                 .andExpect(jsonPath("$.versao").value(1))
                 .andExpect(jsonPath("$.nota").value(5));
-        mvc.perform(get(urlResultado("123", segunda)))
+        mvc.perform(get(urlResultado("123", segunda)).header("X-Matricula", "123"))
                 .andExpect(jsonPath("$.versao").value(2))
                 .andExpect(jsonPath("$.nota").value(9));
     }
@@ -146,7 +148,7 @@ class ResultadoAvaliacaoApiTest {
     void submissaoSemAvaliacaoRetorna404ComMensagemDeIndisponivel() throws Exception {
         Integer submissaoId = submeter("123");
 
-        mvc.perform(get(urlResultado("123", submissaoId)))
+        mvc.perform(get(urlResultado("123", submissaoId)).header("X-Matricula", "123"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensagem").value("O resultado da avaliação ainda não está disponível."));
     }
@@ -156,7 +158,7 @@ class ResultadoAvaliacaoApiTest {
         Integer submissaoId = submeter("123");
         avaliacaoRepository.save(novaAvaliacao(submissaoId));
 
-        mvc.perform(get(urlResultado("123", submissaoId)))
+        mvc.perform(get(urlResultado("123", submissaoId)).header("X-Matricula", "123"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensagem").value("O resultado da avaliação ainda não está disponível."));
     }
@@ -168,7 +170,7 @@ class ResultadoAvaliacaoApiTest {
         avaliacao.falhar("Modelo grok-3: erro 500 da API");
         avaliacaoRepository.save(avaliacao);
 
-        mvc.perform(get(urlResultado("123", submissaoId)))
+        mvc.perform(get(urlResultado("123", submissaoId)).header("X-Matricula", "123"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensagem").value(containsString("não foi concluída")));
     }
@@ -181,14 +183,14 @@ class ResultadoAvaliacaoApiTest {
         avaliacao.concluir(new BigDecimal("8.5"), "e1", "j1");
         avaliacaoRepository.save(avaliacao);
 
-        mvc.perform(get(urlResultado("456", submissaoId)))
+        mvc.perform(get(urlResultado("456", submissaoId)).header("X-Matricula", "456"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensagem").value("Submissão não encontrada."));
     }
 
     @Test
     void submissaoInexistenteRetorna404() throws Exception {
-        mvc.perform(get(urlResultado("123", 999999)))
+        mvc.perform(get(urlResultado("123", 999999)).header("X-Matricula", "123"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensagem").value("Submissão não encontrada."));
     }
@@ -197,7 +199,7 @@ class ResultadoAvaliacaoApiTest {
     void estudanteInexistenteRetorna404() throws Exception {
         Integer submissaoId = submeter("123");
 
-        mvc.perform(get(urlResultado("999", submissaoId)))
+        mvc.perform(get(urlResultado("999", submissaoId)).header("X-Matricula", "999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensagem").value("Estudante não encontrado."));
     }

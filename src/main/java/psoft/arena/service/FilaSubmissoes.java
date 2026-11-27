@@ -47,6 +47,11 @@ public class FilaSubmissoes {
         }
     }
 
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void aoReprocessar(SubmissaoReprocessadaEvent evento) {
+        fila.offer(evento.submissaoId());
+    }
+
     private void consumir() {
         try {
             while (true) {

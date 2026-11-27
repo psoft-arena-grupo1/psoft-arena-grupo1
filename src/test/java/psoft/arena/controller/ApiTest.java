@@ -221,7 +221,7 @@ class ApiTest {
         Integer atividadeId = criarId("/atividades", corpo);
         mvc.perform(json(post("/turmas/" + turmaId + "/estudantes"), "{\"matricula\":\"123\"}"));
 
-        mvc.perform(get("/estudantes/123/atividades"))
+        mvc.perform(get("/estudantes/123/atividades").header("X-Matricula", "123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].titulo").value("Lab 1"))
@@ -232,16 +232,16 @@ class ApiTest {
                 .andExpect(jsonPath("$[0].estrategiaAvaliacao").value("Smells"))
                 .andExpect(jsonPath("$[0].status").value("ABERTA"));
 
-        mvc.perform(get("/estudantes/456/atividades"))
+        mvc.perform(get("/estudantes/456/atividades").header("X-Matricula", "456"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(0)));
 
-        mvc.perform(get("/estudantes/456/atividades/" + atividadeId))
+        mvc.perform(get("/estudantes/456/atividades/" + atividadeId).header("X-Matricula", "456"))
                 .andExpect(status().isForbidden());
 
         mvc.perform(patch("/atividades/" + atividadeId + "/encerrar"));
 
-        mvc.perform(get("/estudantes/123/atividades/" + atividadeId))
+        mvc.perform(get("/estudantes/123/atividades/" + atividadeId).header("X-Matricula", "123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CONCLUIDA"))
                 .andExpect(jsonPath("$.aceitaSubmissoes").value(false));

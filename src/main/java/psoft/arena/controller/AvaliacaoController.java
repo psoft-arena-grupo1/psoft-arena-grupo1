@@ -1,5 +1,7 @@
 package psoft.arena.controller;
 
+import java.util.List;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,8 +24,14 @@ public class AvaliacaoController {
     }
 
     @GetMapping
-    @Operation(summary = "Consulta a avaliação automática de uma submissão")
+    @Operation(summary = "Consulta a avaliação automática mais recente de uma submissão")
     public AvaliacaoResponse buscar(@PathVariable Long submissaoId) {
         return avaliacaoService.buscarPorSubmissao(submissaoId);
+    }
+
+    @GetMapping("/tentativas")
+    @Operation(summary = "US12 - Lista todas as tentativas de avaliação da submissão, da mais antiga para a mais recente")
+    public List<AvaliacaoResponse> listarTentativas(@PathVariable Long submissaoId) {
+        return avaliacaoService.listarTentativas(submissaoId);
     }
 }
