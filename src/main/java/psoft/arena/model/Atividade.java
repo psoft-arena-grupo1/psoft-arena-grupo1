@@ -1,15 +1,22 @@
 package psoft.arena.model;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
 public class Atividade {
@@ -34,6 +41,11 @@ public class Atividade {
     private EstrategiaAvaliacao estrategia;
     @ManyToOne(optional = false)
     private ModeloLlm llmPadrao;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(name = "atividade_llm_adicional", joinColumns = @JoinColumn(name = "atividade_id"), inverseJoinColumns = @JoinColumn(name = "llm_id"), uniqueConstraints = @UniqueConstraint(columnNames = {
+            "atividade_id", "llm_id" }))
+    private List<ModeloLlm> llmsAdicionais = new ArrayList<>();
 
     protected Atividade() {
     }
@@ -93,6 +105,43 @@ public class Atividade {
 
     public ModeloLlm getLlmPadrao() {
         return llmPadrao;
+    }
+
+    public void adicionarLlm(ModeloLlm llm) {
+        if (llm == null || mesmoModelo(llm, llmPadrao) || contemModelo(llmsAdicionais, llm)) {
+            return;
+        }
+        llmsAdicionais.add(llm);
+    }
+
+    public List<ModeloLlm> getLlmsAdicionais() {
+        return List.copyOf(llmsAdicionais);
+    }
+
+    public List<ModeloLlm> modelosDeAvaliacao() {
+        List<ModeloLlm> modelos = new ArrayList<>();
+        if (llmPadrao != null) {
+            modelos.add(llmPadrao);
+        }
+        for (ModeloLlm llm : llmsAdicionais) {
+            if (llm == null || contemModelo(modelos, llm)) {
+                continue;
+            }
+            modelos.add(llm);
+        }
+        return List.copyOf(modelos);
+    }
+
+    private static boolean contemModelo(List<ModeloLlm> modelos, ModeloLlm llm) {
+        return modelos.stream().anyMatch(modelo -> mesmoModelo(modelo, llm));
+    }
+
+    private static boolean mesmoModelo(ModeloLlm primeiro, ModeloLlm segundo) {
+        if (primeiro == segundo) {
+            return true;
+        }
+        return primeiro != null && segundo != null && primeiro.getId() != null
+                && primeiro.getId().equals(segundo.getId());
     }
 
     public void encerrar() {

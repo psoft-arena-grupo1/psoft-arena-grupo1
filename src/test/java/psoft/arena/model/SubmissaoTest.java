@@ -2,12 +2,14 @@ package psoft.arena.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +36,22 @@ class SubmissaoTest {
         ModeloLlm llm = new ModeloLlm("grok-3", "https://api.x.ai/v1", "chave");
         return new Atividade(problema, turma, estrategia, llm, "Lab 1", "Descrição",
                 LocalDateTime.now().plusDays(7));
+    }
+
+    private Submissao novaSubmissao() {
+        return new Submissao(estudante, atividade, CODIGO, 1);
+    }
+
+    private Submissao emFila() {
+        Submissao submissao = novaSubmissao();
+        submissao.encaminhar();
+        return submissao;
+    }
+
+    private Submissao processando() {
+        Submissao submissao = emFila();
+        submissao.iniciarProcessamento();
+        return submissao;
     }
 
     @Test
@@ -122,5 +140,131 @@ class SubmissaoTest {
         assertEquals(1, primeira.getVersao());
         assertEquals(2, segunda.getVersao());
         assertEquals(CODIGO, primeira.getCodigoFonte());
+    }
+
+    // Estados e histórico (padrão State)
+
+    @Test
+    void novaSubmissaoRegistraEstadoInicialNoHistorico() {
+        Submissao submissao = novaSubmissao();
+
+        assertEquals(1, submissao.getHistorico().size());
+        HistoricoSubmissao registro = submissao.getHistorico().get(0);
+        assertNull(registro.getStatusAnterior());
+        assertEquals(StatusSubmissao.SUBMETIDA, registro.getStatusNovo());
+        assertNotNull(registro.getDataHora());
+        assertSame(submissao, registro.getSubmissao());
+    }
+
+    @Test
+    void submissaoPercorreTodosOsEstadosAteConcluida() {
+        Submissao submissao = novaSubmissao();
+
+        submissao.encaminhar();
+        assertEquals(StatusSubmissao.EM_FILA, submissao.getStatus());
+        submissao.iniciarProcessamento();
+        assertEquals(StatusSubmissao.PROCESSANDO, submissao.getStatus());
+        submissao.concluir();
+        assertEquals(StatusSubmissao.CONCLUIDA, submissao.getStatus());
+
+        List<HistoricoSubmissao> historico = submissao.getHistorico();
+        assertEquals(List.of(StatusSubmissao.SUBMETIDA, StatusSubmissao.EM_FILA, StatusSubmissao.PROCESSANDO,
+                StatusSubmissao.CONCLUIDA), historico.stream().map(HistoricoSubmissao::getStatusNovo).toList());
+        for (int i = 1; i < historico.size(); i++) {
+            assertEquals(historico.get(i - 1).getStatusNovo(), historico.get(i).getStatusAnterior());
+        }
+    }
+
+    @Test
+    void transicaoDevolveORegistroDoHistorico() {
+        Submissao submissao = novaSubmissao();
+
+        HistoricoSubmissao registro = submissao.encaminhar();
+
+        assertEquals(StatusSubmissao.SUBMETIDA, registro.getStatusAnterior());
+        assertEquals(StatusSubmissao.EM_FILA, registro.getStatusNovo());
+        assertSame(submissao, registro.getSubmissao());
+        assertSame(registro, submissao.getHistorico().get(submissao.getHistorico().size() - 1));
+    }
+
+    @Test
+    void falhaEhPermitidaEmSubmetidaEmFilaEProcessando() {
+        Submissao submetida = novaSubmissao();
+        Submissao naFila = emFila();
+        Submissao emProcessamento = processando();
+
+        submetida.falhar();
+        naFila.falhar();
+        emProcessamento.falhar();
+
+        assertEquals(StatusSubmissao.FALHA, submetida.getStatus());
+        assertEquals(StatusSubmissao.FALHA, naFila.getStatus());
+        assertEquals(StatusSubmissao.FALHA, emProcessamento.getStatus());
+        assertEquals(StatusSubmissao.PROCESSANDO,
+                emProcessamento.getHistorico().get(emProcessamento.getHistorico().size() - 1).getStatusAnterior());
+    }
+
+    @Test
+    void transicoesForaDeOrdemSaoRejeitadas() {
+        Submissao submetida = novaSubmissao();
+        assertThrows(IllegalStateException.class, submetida::iniciarProcessamento);
+        assertThrows(IllegalStateException.class, submetida::concluir);
+
+        Submissao naFila = emFila();
+        assertThrows(IllegalStateException.class, naFila::encaminhar);
+        assertThrows(IllegalStateException.class, naFila::concluir);
+
+        Submissao emProcessamento = processando();
+        assertThrows(IllegalStateException.class, emProcessamento::encaminhar);
+        assertThrows(IllegalStateException.class, emProcessamento::iniciarProcessamento);
+    }
+
+    @Test
+    void mensagemDeTransicaoInvalidaInformaOEstadoAtual() {
+        IllegalStateException erro = assertThrows(IllegalStateException.class, () -> novaSubmissao().concluir());
+
+        assertEquals("Não é possível concluir uma submissão no estado Submetida.", erro.getMessage());
+    }
+
+    @Test
+    void transicaoInvalidaNaoAlteraStatusNemHistorico() {
+        Submissao submissao = emFila();
+
+        assertThrows(IllegalStateException.class, submissao::concluir);
+
+        assertEquals(StatusSubmissao.EM_FILA, submissao.getStatus());
+        assertEquals(2, submissao.getHistorico().size());
+    }
+
+    @Test
+    void concluidaEhEstadoFinal() {
+        Submissao submissao = processando();
+        submissao.concluir();
+
+        assertThrows(IllegalStateException.class, submissao::encaminhar);
+        assertThrows(IllegalStateException.class, submissao::iniciarProcessamento);
+        assertThrows(IllegalStateException.class, submissao::concluir);
+        assertThrows(IllegalStateException.class, submissao::falhar);
+        assertEquals(StatusSubmissao.CONCLUIDA, submissao.getStatus());
+    }
+
+    @Test
+    void falhaEhEstadoFinal() {
+        Submissao submissao = processando();
+        submissao.falhar();
+
+        assertThrows(IllegalStateException.class, submissao::encaminhar);
+        assertThrows(IllegalStateException.class, submissao::iniciarProcessamento);
+        assertThrows(IllegalStateException.class, submissao::concluir);
+        assertThrows(IllegalStateException.class, submissao::falhar);
+        assertEquals(StatusSubmissao.FALHA, submissao.getStatus());
+    }
+
+    @Test
+    void historicoNaoPodeSerModificadoPorFora() {
+        Submissao submissao = novaSubmissao();
+
+        assertThrows(UnsupportedOperationException.class, () -> submissao.getHistorico().clear());
+        assertEquals(1, submissao.getHistorico().size());
     }
 }

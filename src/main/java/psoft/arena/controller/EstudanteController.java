@@ -15,12 +15,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import psoft.arena.dto.AcompanhamentoSubmissaoResponse;
 import psoft.arena.dto.AtividadeEstudanteResponse;
 import psoft.arena.dto.EstudanteRequest;
 import psoft.arena.dto.EstudanteUpdateRequest;
 import psoft.arena.model.Estudante;
 import psoft.arena.service.AtividadeService;
 import psoft.arena.service.EstudanteService;
+import psoft.arena.service.SubmissaoService;
 
 @RestController
 @RequestMapping("/estudantes")
@@ -29,10 +31,13 @@ public class EstudanteController {
 
     private final EstudanteService estudanteService;
     private final AtividadeService atividadeService;
+    private final SubmissaoService submissaoService;
 
-    public EstudanteController(EstudanteService estudanteService, AtividadeService atividadeService) {
+    public EstudanteController(EstudanteService estudanteService, AtividadeService atividadeService,
+        SubmissaoService submissaoService) {
         this.estudanteService = estudanteService;
         this.atividadeService = atividadeService;
+        this.submissaoService = submissaoService;
     }
 
     @PostMapping
@@ -70,5 +75,17 @@ public class EstudanteController {
     @Operation(summary = "US07 - Consulta uma atividade de uma turma da qual o estudante participa")
     public AtividadeEstudanteResponse buscarAtividade(@PathVariable String matricula, @PathVariable Long id) {
         return atividadeService.buscarDoEstudante(matricula, id);
+    }
+
+    @GetMapping("/{matricula}/submissoes")
+    @Operation(summary = "US09 - Lista as submissões do estudante com o estado atual e o histórico de estados")
+    public List<AcompanhamentoSubmissaoResponse> listarSubmissoes(@PathVariable String matricula) {
+        return submissaoService.listarDoEstudante(matricula);
+    }
+
+    @GetMapping("/{matricula}/submissoes/{id}")
+    @Operation(summary = "US09 - Consulta o andamento de uma submissão do estudante")
+    public AcompanhamentoSubmissaoResponse buscarSubmissao(@PathVariable String matricula, @PathVariable Long id) {
+        return submissaoService.buscarDoEstudante(matricula, id);
     }
 }
